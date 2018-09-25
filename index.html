@@ -1,0 +1,33 @@
+<html>
+
+<body id="app">
+    <p>{{title}}</p>
+    <p><input type="text" v-model="name"></p>
+    <p><span class="111">{{name}}</span><span>你好！</span></P>
+    <p>点击了{{number}}次</p>
+    <button v-on:click="clickMe">click me !</button>
+</body>
+<script src="./js/myVue.js"></script>
+<script type="text/javascript">
+    var myVue = new MyVue({
+        el: '#app',
+        data: {
+            title: 'this is myVue',
+            name: 'chhhhhhhh',
+            number: '1',
+        },
+        methods: {
+            clickMe: function () {
+                this.number = (+this.number + 1);
+            }
+        },
+        mounted: function () {
+            window.setTimeout(() => {
+                this.title = 'this is myVue !!!!!!!';
+            }, 1000);
+        }
+    });
+
+</script>
+
+</html>
