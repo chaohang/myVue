@@ -62,7 +62,7 @@ function Watcher(vm, key, callback) {
     this.value = this.get();
 }
 Watcher.prototype = {
-    update: function () {
+    update: function () { //当属性赋值操作时 更新数据并调用callback
         var value = this.vm.data[this.key];
         var oldVal = this.value;
         if (value != oldVal) {
@@ -77,7 +77,7 @@ Watcher.prototype = {
         return value;
     }
 }
-//处理函数
+//初始化处理函数
 function Compile(el, vm) {
     this.el = document.querySelector(el);
     this.vm = vm;
@@ -91,20 +91,13 @@ Compile.prototype = {
         this.el.appendChild(this.fargment);
     },
     fargmentNode(node) {
-        var fargment = document.createDocumentFragment();
+        var fargment = document.createDocumentFragment(); // 创建空dom
         var child = node.firstChild;
-        while (child) {
+        while (child) { // 将dom都转移到空dom中
             fargment.appendChild(child);
             child = node.firstChild;
         }
         return fargment;
-    },
-    textCompile: function (node, key) {
-        var self = this;
-        this.updateText(node, this.vm[key]);
-        new Watcher(this.vm, key, function (value) {
-            self.updateText(node, value);
-        })
     },
     elementCompile: function (el) {
         var childNodes = el.childNodes;
@@ -114,30 +107,38 @@ Compile.prototype = {
             /**
              * innerText ： 当前节点下的内容
              * textContent ：当前节点下和子节点下所有的内容
+             * nodeType===1 一个element   ===3一个文本
              */
             var text = node.textContent;
-            if (node.nodeType === 1) {
+            if (node.nodeType === 1) { // element时，查看是否放到方法和model
                 self.eveAndModel(node);
-            } else if (node.nodeType === 3 && reg.test(text)) {
+            } else if (node.nodeType === 3 && reg.test(text)) { // 文本时 更新双括号数据，并且添加属性监听
                 self.textCompile(node, reg.exec(text)[1])
             }
 
-            if (node.childNodes && node.childNodes.length) {
+            if (node.childNodes && node.childNodes.length) { // 存在子节点，迭代
                 self.elementCompile(node);
             }
+        })
+    },
+    textCompile: function (node, key) { //更新双扩号，并未他添加监听器
+        var self = this;
+        this.updateText(node, this.vm[key]);
+        new Watcher(this.vm, key, function (value) { // 添加监听器
+            self.updateText(node, value);
         })
     },
     eveAndModel: function (node) {
         var nodeAttrs = node.attributes;
         var self = this;
-        [].slice.call(nodeAttrs).forEach(function (attr) {
+        [].slice.call(nodeAttrs).forEach(function (attr) { //便利属性
             var attrName = attr.name;
-            if (attrName.indexOf('v-') === 0) {
+            if (attrName.indexOf('v-') === 0) { //出现 v- 开头的认定为调用myVue绑定
                 var value = attr.value;
                 var key = attrName.substring(2);
-                if (self.isEvent(key)) {
+                if (self.isEvent(key)) { // 绑定方法
                     self.eventCompile(node, key, value);
-                } else {
+                } else { // 绑定model
                     self.modelCompile(node, key, value);
                 }
                 node.removeAttribute(attrName);
@@ -148,28 +149,28 @@ Compile.prototype = {
         var eve = key.split(':')[1];
         var callback = this.vm.methods && this.vm.methods[methodKey];
         if (eve && callback) {
-            node.addEventListener(eve, callback.bind(this.vm), true);
+            node.addEventListener(eve, callback.bind(this.vm), true); // 添加事件 触发时 调用callback
         }
     },
-    modelCompile: function (node, key, dataKey) {
+    modelCompile: function (node, key, dataKey) { // 模型绑定时
         var self = this;
         var val = this.vm[dataKey];
         this.updateModel(node, val);
-        new Watcher(this.vm, dataKey, function (value) {
-            self.updateModel(node, value);
+        new Watcher(this.vm, dataKey, function (value) { //添加监听
+            self.updateModel(node, value); //触发时 更新value值
         })
         var tagName = node.tagName && node.tagName.toLowerCase();
         var event = 'change'
         if (tagName === 'input') {
             event = 'input';
         }
-        node.addEventListener(event, function (e) {
+        node.addEventListener(event, function (e) { // 添加事件监听
             var newValue = e.target.value;
             if (val === newValue) {
                 return;
             }
             val = newValue;
-            self.vm[dataKey] = newValue;
+            self.vm[dataKey] = newValue; //更改数据
         })
     },
     updateText: function (node, value) {
@@ -189,18 +190,18 @@ function MyVue(options) {
     this.data = options.data;
     var self = this;
     this.methods = options.methods;
-    Object.keys(this.data).forEach(key => {
+    Object.keys(this.data).forEach(key => { // 我们想要的结果是 vm.xxx 而不是 vm.data.xxx  此处处理下
         self.proxyKeys(key);
     });
-    objServer(this.data);
-    new Compile(options.el, this);
+    objServer(this.data);// 重写对象所有属性的set get
+    new Compile(options.el, this);// 初始化
     options.mounted.call(this);
 }
 
 MyVue.prototype = {
     proxyKeys: function (key) {
         var that = this;
-        Object.defineProperty(this, key, {
+        Object.defineProperty(this, key, { // 重写属性 ，中间层 ‘data’ 在此处处理掉
             enumerable: true,
             configurable: true,
             get: function proxyGetter() {
